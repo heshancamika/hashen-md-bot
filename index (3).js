@@ -25,6 +25,7 @@ const {
   const l = console.log
   const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
   const { AntiDelDB, initializeAntiDeleteSettings, setAnti, getAnti, getAllAntiDeleteSettings, saveContact, loadMessage, getName, getChatSummary, saveGroupMetadata, getGroupMetadata, saveMessageCount, getInactiveGroupMembers, getGroupMembersMessageCount, saveMessage } = require('./data')
+  const { performanceMonitor } = require('./lib/performance')
   const fs = require('fs')
   const ff = require('fluent-ffmpeg')
   const P = require('pino')
@@ -136,16 +137,20 @@ const port = process.env.PORT || 9090;
   //=============readstatus=======
         
   conn.ev.on('messages.upsert', async(mek) => {
+    const startTime = Date.now();
+    performanceMonitor.recordMessage();
+    
     mek = mek.messages[0]
     if (!mek.message) return
     mek.message = (getContentType(mek.message) === 'ephemeralMessage') 
     ? mek.message.ephemeralMessage.message 
     : mek.message;
-    //console.log("New Message Detected:", JSON.stringify(mek, null, 2));
-  if (config.READ_MESSAGE === 'true') {
-    await conn.readMessages([mek.key]);  // Mark message as read
-    console.log(`Marked message from ${mek.key.remoteJid} as read.`);
-  }
+    
+    // Optimize read message handling
+    if (config.READ_MESSAGE === 'true') {
+      // Don't await this to prevent blocking
+      conn.readMessages([mek.key]).catch(console.error);
+    }
     if(mek.message.viewOnceMessageV2)
     mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
     if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN === "true"){
@@ -167,9 +172,11 @@ const port = process.env.PORT || 9090;
   const text = `${config.AUTO_STATUS_MSG}`
   await conn.sendMessage(user, { text: text, react: { text: '💜', key: mek.key } }, { quoted: mek })
             }
-            await Promise.all([
-              saveMessage(mek),
-            ]);
+            // Optimize message saving - don't await to prevent blocking
+            saveMessage(mek).catch(err => {
+              console.error('Message save error:', err);
+              performanceMonitor.recordError();
+            });
   const m = sms(conn, mek)
   const type = getContentType(mek.message)
   const content = JSON.stringify(mek.message)
@@ -308,6 +315,7 @@ if (!isReact && config.CUSTOM_REACT === 'true') {
   cmd.function(conn, mek, m,{from, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply});
   } catch (e) {
   console.error("[PLUGIN ERROR] " + e);
+  performanceMonitor.recordError();
   }
   }
   }
@@ -327,6 +335,10 @@ if (!isReact && config.CUSTOM_REACT === 'true') {
   ) {
   command.function(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply})
   }});
+  
+  // Record response time
+  const responseTime = Date.now() - startTime;
+  performanceMonitor.recordResponseTime(responseTime);
   
   });
     //===================================================   

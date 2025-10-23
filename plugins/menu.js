@@ -2,6 +2,7 @@ const config = require('../config');
 const { cmd, commands } = require('../command');
 const axios = require('axios');
 const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson, clockString, jsonformat } = require("../lib/functions");
+const { globalCache } = require('../lib/cache');
 const os = require('os');
 
 cmd({
@@ -12,18 +13,22 @@ cmd({
     filename: __filename
 }, async (conn, mek, m, { from, reply }) => {
     try {
-            const pushname = m.pushName || "User";
-            
-            let hostname;
-    if (os.hostname().length == 12) {
-      hostname = "replit";
-    } else if (os.hostname().length == 36) {
-      hostname = "heroku";
-    } else if (os.hostname().length == 8) {
-      hostname = "koyeb";
-    } else {
-      hostname = os.hostname();
-    }
+        const pushname = m.pushName || "User";
+        
+        // Cache hostname detection
+        let hostname = globalCache.get('hostname');
+        if (!hostname) {
+            if (os.hostname().length == 12) {
+                hostname = "replit";
+            } else if (os.hostname().length == 36) {
+                hostname = "heroku";
+            } else if (os.hostname().length == 8) {
+                hostname = "koyeb";
+            } else {
+                hostname = os.hostname();
+            }
+            globalCache.set('hostname', hostname, 300000); // Cache for 5 minutes
+        }
         const menuCaption = `
         ❖─👨‍💻 ᴍᴀᴅᴜꜱᴀɴᴋᴀ 𝙼𝙳  👨‍💻─❖\n\n╭───═❮ *ᴍᴇɴᴜ ʟɪsᴛ* ❯═───❖\n│*𝗛𝗘𝗬 ${pushname} 👋*\n│ *🚀𝙑𝙀𝙍𝙎𝙄𝙊𝙉:* ${require("../package.json").version}\n│ *⌛𝙈𝙀𝙈𝙊𝙍𝙔:* ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB / ${Math.round(require('os').totalmem / 1024 / 1024)}MB\n│ *🕒𝙍𝙐𝙉𝙏𝙄𝙈𝙀:* ${runtime(process.uptime())}\n│ *📍𝙋𝙇𝘼𝙏𝙁𝙊𝙍𝙈:* ${hostname}\n╰━━━━━━━━━━━━━━━┈⊷
         
@@ -489,12 +494,22 @@ https://chat.whatsapp.com/GyKadMbtiIx3krsxwjgh0v
             }
         };
 
-        // Add listener
+        // Add listener with proper cleanup
+        const listenerId = `menu_${Date.now()}_${Math.random()}`;
         conn.ev.on("messages.upsert", handler);
+
+        // Store handler reference for cleanup
+        if (!conn._menuHandlers) {
+            conn._menuHandlers = new Map();
+        }
+        conn._menuHandlers.set(listenerId, handler);
 
         // Remove listener after 5 minutes
         setTimeout(() => {
-            conn.ev.off("messages.upsert", handler);
+            if (conn._menuHandlers && conn._menuHandlers.has(listenerId)) {
+                conn.ev.off("messages.upsert", handler);
+                conn._menuHandlers.delete(listenerId);
+            }
         }, 300000);
 
     } catch (e) {

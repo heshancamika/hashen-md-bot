@@ -5,11 +5,27 @@ const { DataTypes } = require('sequelize');
 const { DATABASE } = require('../lib/database');
 const storeDir = path.join(process.cwd(), 'store');
 
+// Cache for frequently accessed data
+const cache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+const writeQueue = new Map();
+
 const readJSON = async (file) => {
   try {
+    // Check cache first
+    const cacheKey = `read_${file}`;
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+
     const filePath = path.join(storeDir, file);
     const data = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    
+    // Cache the result
+    cache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+    return parsed;
   } catch {
     return [];
   }
@@ -17,8 +33,30 @@ const readJSON = async (file) => {
 
 const writeJSON = async (file, data) => {
   const filePath = path.join(storeDir, file);
-  await fs.mkdir(storeDir, { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+  
+  // Debounce writes to prevent excessive I/O
+  const queueKey = `write_${file}`;
+  if (writeQueue.has(queueKey)) {
+    clearTimeout(writeQueue.get(queueKey));
+  }
+  
+  const timeoutId = setTimeout(async () => {
+    try {
+      await fs.mkdir(storeDir, { recursive: true });
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+      
+      // Update cache
+      const cacheKey = `read_${file}`;
+      cache.set(cacheKey, { data, timestamp: Date.now() });
+      
+      writeQueue.delete(queueKey);
+    } catch (error) {
+      console.error('Write error:', error);
+      writeQueue.delete(queueKey);
+    }
+  }, 100); // 100ms debounce
+  
+  writeQueue.set(queueKey, timeoutId);
 };
 
 const saveContact = async (jid, name) => {
@@ -42,21 +80,65 @@ const getContacts = async () => {
   }
 };
 
+// Batch processing for messages
+let messageBatch = [];
+let batchTimeout = null;
+const BATCH_SIZE = 10;
+const BATCH_DELAY = 2000; // 2 seconds
+
+const processMessageBatch = async () => {
+  if (messageBatch.length === 0) return;
+  
+  const batch = messageBatch.splice(0, BATCH_SIZE);
+  const messages = await readJSON('message.json');
+  
+  for (const { message } of batch) {
+    const jid = message.key.remoteJid;
+    const id = message.key.id;
+    if (!id || !jid || !message) continue;
+    
+    const index = messages.findIndex((msg) => msg.id === id && msg.jid === jid);
+    const timestamp = message.messageTimestamp ? message.messageTimestamp * 1000 : Date.now();
+    
+    if (index > -1) {
+      messages[index].message = message;
+      messages[index].timestamp = timestamp;
+    } else {
+      messages.push({ id, jid, message, timestamp });
+    }
+  }
+  
+  await writeJSON('message.json', messages);
+  
+  // Process remaining batch if any
+  if (messageBatch.length > 0) {
+    batchTimeout = setTimeout(processMessageBatch, BATCH_DELAY);
+  } else {
+    batchTimeout = null;
+  }
+};
+
 const saveMessage = async (message) => {
   const jid = message.key.remoteJid;
   const id = message.key.id;
   if (!id || !jid || !message) return;
-  await saveContact(message.sender, message.pushName);
-  const messages = await readJSON('message.json');
-  const index = messages.findIndex((msg) => msg.id === id && msg.jid === jid);
-  const timestamp = message.messageTimestamp ? message.messageTimestamp * 1000 : Date.now();
-  if (index > -1) {
-    messages[index].message = message;
-    messages[index].timestamp = timestamp;
-  } else {
-    messages.push({ id, jid, message, timestamp });
+  
+  // Save contact asynchronously without waiting
+  saveContact(message.sender, message.pushName).catch(console.error);
+  
+  // Add to batch
+  messageBatch.push({ message });
+  
+  // Process batch if it's full or start timer if it's the first message
+  if (messageBatch.length >= BATCH_SIZE) {
+    if (batchTimeout) {
+      clearTimeout(batchTimeout);
+      batchTimeout = null;
+    }
+    processMessageBatch();
+  } else if (!batchTimeout) {
+    batchTimeout = setTimeout(processMessageBatch, BATCH_DELAY);
   }
-  await writeJSON('message.json', messages);
 };
 
 const loadMessage = async (id) => {
