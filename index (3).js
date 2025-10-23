@@ -68,6 +68,7 @@ const {
   //===================SESSION-AUTH============================
 if (!fs.existsSync(__dirname + '/sessions/creds.json')) {
 if(!config.SESSION_ID) return console.log('Please add your session to SESSION_ID env !!')
+console.log('Downloading session... ⏳');
 const sessdata = config.SESSION_ID.replace("MADUSANKA-MD=", '');
 const filer = File.fromURL(`https://mega.nz/file/${sessdata}`)
 filer.download((err, data) => {
@@ -105,12 +106,15 @@ const port = process.env.PORT || 9090;
   } else if (connection === 'open') {
   console.log('🧬 Installing Plugins')
   const path = require('path');
-  fs.readdirSync("./plugins/").forEach((plugin) => {
-  if (path.extname(plugin).toLowerCase() == ".js") {
+  const pluginFiles = fs.readdirSync("./plugins/").filter(plugin => path.extname(plugin).toLowerCase() == ".js");
+  pluginFiles.forEach((plugin) => {
+  try {
   require("./plugins/" + plugin);
+  } catch (error) {
+  console.error(`Error loading plugin ${plugin}:`, error.message);
   }
   });
-  console.log('Plugins installed successful ✅')
+  console.log(`Plugins installed successful ✅ (${pluginFiles.length} loaded)`)
   console.log('Bot connected to whatsapp ✅')
   
   let up = `*Hello there MADUSANKA-MD User! \ud83d\udc4b\ud83c\udffb* \n\n> Simple , Straight Forward But Loaded With Features \ud83c\udf8a, Meet MADUSANKA-MD WhatsApp Bot.\n\n *Thanks for using MADUSANKA-MD \ud83d\udea9* \n\n> Join WhatsApp Channel :- ⤵️\n \nhttps://whatsapp.com/channel/0029Vb5dCoxVJfHcRa0b2y\n\n- *YOUR PREFIX:* = ${prefix}\n\nDont forget to give star to repo ⬇️\n\nhttps://github.com/maduuYT36/MADUSANKA-MD\n\n> © 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚢 𝙼𝙰𝙳𝚄𝚂𝙰𝙽𝙺𝙰 𝙼𝙳 \ud83d\udda4`;
@@ -774,4 +778,4 @@ if (!isReact && config.CUSTOM_REACT === 'true') {
   app.listen(port, () => console.log(`Server listening on port http://localhost:${port}`));
   setTimeout(() => {
   connectToWA()
-  }, 4000);
+  }, 1000);
