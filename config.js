@@ -23,13 +23,13 @@ ANTI_LINK: process.env.ANTI_LINK || "true",
 // make anti link true,false for groups 
 MENTION_REPLY: process.env.MENTION_REPLY || "false",
 // make true if want auto voice reply if someone menetion you 
-MENU_IMAGE_URL: process.env.MENU_IMAGE_URL || "https://files.catbox.moe/x54ibb.jpg",
+MENU_IMAGE_URL: process.env.MENU_IMAGE_URL || "https://i.imgur.com/AlZhWDu.jpeg",
 // add custom menu and mention reply image url
 PREFIX: process.env.PREFIX || ".",
 // add your prifix for bot   
-BOT_NAME: process.env.BOT_NAME || "MADUSANKA_MD",
+BOT_NAME: process.env.BOT_NAME || "MADUSANKA-MD PRO",
 // add bot namw here for menu
-STICKER_NAME: process.env.STICKER_NAME || "MADUSANKA_MD",
+STICKER_NAME: process.env.STICKER_NAME || "MADUSANKA-MD PRO",
 // type sticker pack name 
 CUSTOM_REACT: process.env.CUSTOM_REACT || "false",
 // make this true for custum emoji react    
@@ -37,13 +37,13 @@ CUSTOM_REACT_EMOJIS: process.env.CUSTOM_REACT_EMOJIS || "💝,💖,💗,❤️�
 // chose custom react emojis by yourself 
 DELETE_LINKS: process.env.DELETE_LINKS || "false",
 // automatic delete links witho remove member 
-OWNER_NUMBER: process.env.OWNER_NUMBER || "94743387798",
+OWNER_NUMBER: process.env.OWNER_NUMBER || "94729101856",
 // add your bot owner number
-OWNER_NAME: process.env.OWNER_NAME || "𝗗𝗔𝗠𝗜𝗧𝗛 𝗠𝗔𝗗𝗨𝗦𝗔𝗡𝗞𝗔",
+OWNER_NAME: process.env.OWNER_NAME || "Damith Madusanka",
 // add bot owner name
 DESCRIPTION: process.env.DESCRIPTION || "> © 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚢 𝙼𝙰𝙳𝚄𝚂𝙰𝙽𝙺𝙰 𝙼𝙳",
 // add bot owner name    
-ALIVE_IMG: process.env.ALIVE_IMG || "https://files.catbox.moe/x54ibb.jpg",
+ALIVE_IMG: process.env.ALIVE_IMG || "https://i.imgur.com/AlZhWDu.jpeg",
 // add img for alive msg
 LIVE_MSG: process.env.LIVE_MSG || "> Hello I'am alive now",
 // add alive msg here 
